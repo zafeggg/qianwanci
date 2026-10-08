@@ -27,8 +27,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
-          # 仓库未提交 go.sum 之外的缓存，交给 setup-go 缓存
+          # 与开发/验证环境对齐（本地 go1.24 下 build/vet/test 全绿；1.21 组合从未被本地验证，
+          # 2026-10-08 首次 CI 实测 1.21 编译失败，故升到 1.24）
+          go-version: '1.24'
           cache-dependency-path: houduan/TiMi/go.sum
       - name: 编译全部包
         run: go build ./...
