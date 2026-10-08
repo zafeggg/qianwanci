@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>千万次 · 众筹演示台（本地 Demo）</title>
+<style>
+  :root{
+    --bg:#0e1220; --panel:#161b2e; --panel2:#1d2440; --line:#2a3357;
+    --tx:#e8ecf8; --dim:#8fa0c9; --acc:#4f8cff; --ok:#2ecc71; --warn:#f5b041; --bad:#e74c3c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg); color:var(--tx); font:14px/1.5 "Microsoft YaHei",system-ui,sans-serif;}
+  .wrap{max-width:1180px; margin:0 auto; padding:16px;}
+  header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
+  header h1{font-size:20px; letter-spacing:1px;}
+  .pill{background:var(--panel2); border:1px solid var(--line); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--dim);}
+  .dot{display:inline-block; width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+  button{background:var(--acc); color:#fff; border:0; border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:transparent; border:1px solid var(--line); color:var(--dim)}
+  button.sm{padding:3px 9px; font-size:12px; border-radius:6px}
+  button.warn{background:var(--warn)}
+  input,select{background:#0f1426; border:1px solid var(--line); color:var(--tx); border-radius:8px; padding:7px 10px; font-size:13px; outline:none}
+  input:focus{border-color:var(--acc)}
+  .grid{display:grid; grid-template-columns: 340px 1fr 300px; gap:14px; align-items:start;}
+  @media (max-width:1080px){ .grid{grid-template-columns:1fr;} }
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px;}
+  .card h3{font-size:14px; margin-bottom:10px; color:#c8d4f4; display:flex; justify-content:space-between; align-items:center;}
+  .mono{font-family:Consolas,monospace; font-size:11px; color:var(--dim); word-break:break-all}
+  .row{display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px dashed #20294a}
+  .row:last-child{border-bottom:0}
+  .tag{display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px}
+  .t1{background:#1c5d3b; color:#7ce7a9} .t0{background:#5b5f74; color:#d5d9ec} .t2{background:#7a5a1c; color:#f7d08a} .t3{background:#4a2f2f; color:#f3a9a9}
+  .bar{height:10px; background:#0c1122; border-radius:6px; overflow:hidden; margin:6px 0}
+  .bar>i{display:block; height:100%; background:linear-gradient(90deg,#2f7bff,#43e0c2)}
+  .wallet-chip{cursor:pointer; display:inline-flex; align-items:center; gap:6px; padding:3px 10px; margin:2px; border-radius:14px; background:var(--panel2); border:1px solid var(--line); font-size:12px}
+  .wallet-chip.on{border-color:var(--acc); color:#fff}
+  .toast{position:fixed; right:16px; bottom:16px; max-width:420px; display:flex; flex-direction:column; gap:8px; z-index:99}
+  .toast div{background:#202a4e; border:1px solid var(--line); border-radius:10px; padding:9px 14px; font-size:13px; box-shadow:0 6px 18px #0008; animation:pop .18s}
+  .toast div.bad{border-color:#8c3a3a} .toast div.okk{border-color:#23683f}
+  @keyframes pop{from{opacity:0; transform:translateY(6px)} to{opacity:1}}
+  .modal{position:fixed; inset:0; background:#000a; display:none; align-items:center; justify-content:center; z-index:50}
+  .modal.show{display:flex}
+  .modal .box{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; width:380px; max-width:94vw}
+  .modal .box h3{margin-bottom:12px}
+  .modal .fields label{display:block; font-size:12px; color:var(--dim); margin:10px 0 4px}
+  .modal .fields input{width:100%}
+  img.captcha{width:160px; height:56px; border-radius:8px; border:1px solid var(--line); cursor:pointer; display:block; margin:8px 0}
+  details pre{background:#0b0f1f; color:#b9c6ea; padding:10px; border-radius:8px; max-height:240px; overflow:auto; font-size:11px; margin-top:6px}
+  .muted{color:var(--dim); font-size:12px}
+  .num{font-weight:700}
+  .val-ok{color:var(--ok)} .val-bad{color:var(--bad)} .val-warn{color:var(--warn)}
+  table{width:100%; border-collapse:collapse; font-size:12px}
+  th,td{padding:5px 6px; text-align:left; border-bottom:1px solid #20294a; white-space:nowrap}
+  th{color:var(--dim); font-weight:normal}
+  .actionbar{display:flex; gap:8px; flex-wrap:wrap; margin:8px 0}
+  .empty{color:var(--dim); font-size:12px; padding:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚡ 千万次 · 众筹演示台</h1>
+    <span class="pill"><span id="stDot" class="dot bad"></span><span id="stTxt">检测 npower 中…</span></span>
+    <span class="pill" id="gwPill"></span>
+    <div style="margin-left:auto; display:flex; gap:8px">
+      <button class="ghost sm" onclick="demo.bootstrap()">初始化演示数据</button>
+      <button class="sm" onclick="demo.regWallet()">＋ 新建演示钱包</button>
+      <button class="ghost sm" onclick="demo.refreshAll(true)">刷新</button>
+      <button class="ghost sm" onclick="location.href='/admin.html'">🛠 后台</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- 左：钱包 -->
+    <div>
+      <div class="card">
+        <h3>👛 我的钱包 <button class="ghost sm" onclick="demo.refreshInfo()">刷新</button></h3>
+        <div id="walletEmpty" class="empty">还没有钱包。<br>先点右上角「初始化演示数据」，再用「＋ 新建演示钱包」注册一个（邀请码自动填 DEMO8888）。</div>
+        <div id="walletArea" style="display:none">
+          <div class="row"><span>名称</span><b id="wName">-</b></div>
+          <div class="row"><span>KTO 地址</span><span class="mono" id="wAddr">-</span></div>
+          <div class="row"><span>TRON 地址</span><span class="mono" id="wTron">-</span></div>
+          <div class="row"><span>邀请码</span><b id="wCode" class="val-warn">-</b></div>
+          <div class="row"><span>登录口令（演示）</span><b id="wPwd">-</b></div>
+          <div style="margin-top:8px"><button class="ghost sm" onclick="demo.switchWallet(-1)">登出</button>
+          <span class="muted" style="margin-left:6px">提示：登录态=JWT，存于本浏览器 localStorage。</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="display:none" id="assetCard">
+        <h3>💎 资产</h3>
+        <div id="assetList"></div>
+        <div class="actionbar">
+          <button class="sm" onclick="demo.faucet('FIBO')">领 20万 FIBO</button>
+          <button class="sm" onclick="demo.faucet('BOFI')">领 1000 BOFI</button>
+          <button class="sm" onclick="demo.faucet('USDT')">领 1万 USDT</button>
+        </div>
+        <div class="muted">领币直接写本地库余额（模拟充值到账），仅演示用。</div>
+      </div>
+
+      <div class="card" id="walletSwitchCard" style="display:none">
+        <h3>🔁 切换钱包（多账号演示）</h3>
+        <div id="walletChips"></div>
+      </div>
+
+      <div class="card" id="communityCard" style="display:none">
+        <h3>👥 我的社区</h3>
+        <div class="row"><span>直推总数</span><b id="cmTotal">0</b></div>
+        <div class="row"><span>F1 / F2 / F3</span><span><span class="val-ok" id="cmF1">0</span> / <span class="val-warn" id="cmF2">0</span> / <span class="val-bad" id="cmF3">0</span></span></div>
+        <div style="margin-top:6px" id="cmList"></div>
+      </div>
+    </div>
+
+    <!-- 中：众筹 -->
+    <div>
+      <div class="card">
+        <h3>🏆 众筹 · 期/轮进度 <span class="muted" id="homeHint"></span></h3>
+        <div id="projChips" style="margin-bottom:6px"></div>
+        <div id="roundList"></div>
+      </div>
+      <div class="card" id="roundDetailCard" style="display:none">
+        <h3>🔎 选中轮 · 详情</h3>
+        <div id="roundDetail"></div>
+        <div class="actionbar">
+          <button id="voteBtn" class="warn" onclick="demo.voteOpen()">💰 投入这轮</button>
+        </div>
+      </div>
+      <div class="card" id="myVotesCard" style="display:none">
+        <h3>🧾 我的投入记录</h3>
+        <div id="myVotes"></div>
+      </div>
+
+      <div class="card" id="hashpowerCard" style="display:none">
+        <h3>💠 算力矿机（爆仓补偿折算）<button class="ghost sm" onclick="ext.refreshHash()">刷新</button></h3>
+        <div class="row"><span>总算力</span><b id="hpPower" class="val-warn">-</b></div>
+        <div class="row"><span>累计产出 / 剩余可提</span><span><b id="hpReward" class="val-ok">-</b> / <b id="hpRemain" class="val-ok">-</b> FIBO</span></div>
+        <div id="hpList" style="margin-top:8px"></div>
+        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #20294a">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+            <input id="hpAmount" type="number" value="50" min="1" style="width:120px" title="提取数量(FIBO)" />
+            <input id="hpPwd" type="password" placeholder="钱包口令" style="width:130px" />
+            <button class="sm warn" onclick="ext.withdrawHash()">提取 FIBO</button>
+          </div>
+          <div class="muted" style="margin-top:6px">最低起提 50 FIBO（可多账户合并提取）。演示环境算力余额由「轮次失败结算」产生，需先跑 round 结算。</div>
+        </div>
+      </div>
+
+      <div class="card" id="toolCard">
+        <h3>🧰 测试工具（手续费预估 / 流水 / 提币）</h3>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0">
+          <select id="feeSymSel" style="width:110px"></select>
+          <input id="feeAmtIn" type="number" value="1000" min="1" style="width:130px" title="预估金额" />
+          <button class="sm" onclick="ext.estFee()">预估提币手续费</button>
+          <span id="feeRes" class="val-ok" style="font-size:12px"></span>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0">
+          <input id="txSymIn" list="symList" value="FIBO" style="width:110px" title="币种" />
+          <select id="txDirIn" style="width:110px"><option value="0">全部流水</option><option value="1">转入</option><option value="2">转出</option></select>
+          <button class="sm" onclick="ext.listTx()">查流水</button>
+          <button class="sm ghost" onclick="ext.showTxBox(false)">隐藏结果</button>
+        </div>
+        <div id="txRes" style="display:none; margin-top:6px; max-height:220px; overflow:auto"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; border-top:1px dashed #20294a; padding-top:8px">
+          <select id="wdSymIn" style="width:110px"></select>
+          <input id="wdAmtIn" type="number" value="100" min="1" style="width:120px" title="提币数量" />
+          <input id="wdAddrIn" placeholder="目标地址(演示填自己的 KTO/TRON 地址)" style="flex:1;min-width:180px" />
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <input id="wdPwdIn" type="password" placeholder="钱包口令" style="width:130px" />
+          <button class="sm warn" onclick="ext.withdrawCoin()">发起提币（上链）</button>
+          <span class="muted">本地无链服务(:1527)，提币会在上链步骤失败——用于联调/看错误。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：消息 & 调试 -->
+    <div>
+      <div class="card">
+        <h3>📢 系统消息</h3>
+        <div id="notices"></div>
+      </div>
+      <div class="card">
+        <h3>⚙️ 演示数据</h3>
+        <div id="demoInfo" class="muted">加载中…</div>
+        <div class="actionbar" style="margin-top:8px">
+          <button class="sm" onclick="demo.bootstrap()">确保演示数据存在</button>
+        </div>
+        <div class="muted">说明：演示轮 target=260万 FIBO；无链上依赖，投票即推进进度。</div>
+      </div>
+      <details class="card" open>
+        <summary style="cursor:pointer; color:#c8d4f4; font-weight:bold">🐞 原始接口日志（JSON）</summary>
+        <pre id="rawLog"></pre>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- 投票弹窗 -->
+<div class="modal" id="voteModal">
+  <div class="box">
+    <h3>💰 投入众筹（第 <span id="vmRound">-</span> 轮）</h3>
+    <div class="row"><span>该轮币种</span><b id="vmSymbol">FIBO</b></div>
+    <div class="row"><span>我的可用余额</span><b id="vmBalance" class="val-ok">-</b></div>
+    <div class="fields">
+      <label>投入数量（个，最小 10）</label>
+      <input id="vmAmount" type="number" value="1000" min="10" />
+      <label>图形验证码</label>
+      <img id="vmCap" class="captcha" alt="captcha" title="点我刷新" onclick="demo.newCaptcha()" />
+      <input id="vmCapSol" placeholder="输入图片中的字符" style="width:160px" />
+    </div>
+    <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end">
+      <button class="ghost" onclick="demo.voteClose()">取消</button>
+      <button class="warn" onclick="demo.submitVote()">确认投入</button>
+    </div>
+    <div id="voteMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+</div>
+<div class="toast" id="toasts"></div>
+
+<script>
+"use strict";
+const DEC = {"USDT":1e6,"FIBO":1e8,"KTO":1e12,"FUSD":1e8,"BOFI":1e8,"PCB":1e8};
+const RST = {0:["未开始","t0"],1:["进行中","t1"],2:["待结算","t2"],3:["已结束","t3"]};
+const LS = "npowerDemoWalletsV1";
+const state = {wallets: [], active: -1, roundId: null, capId: null, timer: null, selected: null};
+
+// ---------- 基础工具 ----------
+function $(id){ return document.getElementById(id); }
+function toast(msg, cls){
+  const d = document.createElement("div");
+  d.textContent = msg; if (cls) d.className = cls;
+  $("toasts").appendChild(d);
+  setTimeout(()=>d.remove(), 4200);
+}
+function fmt(n){
+  // 单位口径（复盘修复）：服务端 /home、/wallet、/home/voteList 返回的金额与轮数据均为"主单位(币)"，
+  // 不再按 DEC 二次换算；投票提交同样直接传主单位（后端 vote.go:52 自行 ×精度）。
+  return (Number(n)||0).toLocaleString("zh-CN", {maximumFractionDigits: 4});
+}
+function nowStr(){ return new Date().toLocaleTimeString(); }
+
+function logRaw(label, obj){
+  const pre = $("rawLog");
+  const txt = (typeof obj === "string") ? obj : JSON.stringify(obj, null, 1);
+  pre.textContent = "[" + nowStr() + "] " + label + "\n" + txt + "\n----------------------\n" + pre.textContent;
+  if (pre.textContent.length > 20000) pre.textContent = pre.textContent.slice(0, 20000);
+}
+
+// 网关 API（需要协议加密的在网关内完成，这里只带 X-Demo-Token）
+async function api(method, path, body, needAuth=true){
+  const opts = {method, headers: {}};
+  if (body !== undefined){ opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  const w = curWallet();
+  if (needAuth && w && w.token) opts.headers["X-Demo-Token"] = w.token;
+  let resp;
+  try { resp = await fetch("/api" + path, opts); }
+  catch(e){ logRaw("NET-ERR " + path, e.message); throw new Error("网络错误: " + e.message); }
+  const raw = await resp.text();
+  let j; try { j = JSON.parse(raw); } catch(e){ j = raw; }
+  logRaw(method + " " + path, j);
+  if (j && typeof j === "object" && "code" in j){
+    if (j.code === 200) return j.data !== undefined ? j.data : j;
+    const err = new Error(j.msg || ("code " + j.code));
+    err.bizCode = j.code; throw err;
+  }
+  if (!resp.ok) throw new Error("HTTP " + resp.status);
+  return j;
+}
+async function demoApi(path, body){
+  const opts = {method: "POST", headers: {"Content-Type":"application/json"}};
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const resp = await fetch(path, opts);
+  const raw = await resp.text();
+  let j; try { j = JSON.parse(raw); } catch(e){ j = raw; }
+  logRaw("POST " + path, j);
+  if (j && j.ok) return j.data;
+  throw new Error((j && j.error) || "演示接口失败");
+}
+function save(){ localStorage.setItem(LS, JSON.stringify({wallets: state.wallets, active: state.active})); }
+function load(){
+  try { const s = JSON.parse(localStorage.getItem(LS)||"{}"); state.wallets = s.wallets || []; state.active = s.active ?? -1; } catch(e){}
+}
+function curWallet(){ return (state.active >= 0 && state.wallets[state.active]) || null; }
+
+// ---------- 渲染 ----------
+function renderWallet(){
+  const w = curWallet();
+  $("walletEmpty").style.display = w ? "none" : "block";
+  $("walletArea").style.display = w ? "block" : "none";
+  $("assetCard").style.display = w ? "block" : "none";
+  $("walletSwitchCard").style.display = state.wallets.length > 1 ? "block" : "none";
+  $("communityCard").style.display = w ? "block" : "none";
+  if (!w) return;
+  $("wName").textContent = w.name || "-";
+  $("wAddr").textContent = w.address || "-";
+  $("wTron").textContent = w.usdtAddress || "-";
+  $("wCode").textContent = w.code || "…";
+  $("wPwd").textContent = w.pwd || "-";
+  const chips = $("walletChips"); chips.innerHTML = "";
+  state.wallets.forEach((x,i)=>{
+    const s = document.createElement("span");
+    s.className = "wallet-chip" + (i===state.active ? " on" : "");
+    s.textContent = x.name || ("#" + i);
+    s.onclick = () => demo.switchWallet(i);
+    chips.appendChild(s);
+  });
+  save();
+}
+
+function renderAssets(data){
+  const el = $("assetList"); el.innerHTML = "";
+  const assets = (data && data.assetList) || [];
+  if (!assets.length){ el.innerHTML = '<div class="empty">暂无资产，点下方按钮领测试币</div>'; return; }
+  assets.forEach(a=>{
+    const div = document.createElement("div"); div.className = "row";
+    div.innerHTML = "<span>" + a.symbol + " <span class='muted'>@" + (a.price||0) + "</span></span>" +
+      "<b class='num'>" + (a.amount||0).toLocaleString("zh-CN", {maximumFractionDigits:4}) + "</b>";
+    el.appendChild(div);
+  });
+  const tot = $("assetCard").querySelector("h3");
+  tot.textContent = "💎 资产（估值 ≈ " + ((data&&data.usdt)||0).toLocaleString() + " USDT）";
+}
+
+function renderRounds(rList, projectIdFocus){
+  const el = $("roundList"); el.innerHTML = "";
+  const list = rList || [];
+  if (!list.length){ el.innerHTML = '<div class="empty">暂无轮次 —— 点右上角「初始化演示数据」。</div>'; return; }
+  list.forEach(rd=>{
+    const st = RST[rd.status] || ["未知","t0"];
+    const pct = rd.targetVote > 0 ? Math.min(100, rd.currentVote / rd.targetVote * 100) : 0;
+    const mine = (state.selected && state.selected.id === rd.id);
+    const c = document.createElement("div");
+    c.className = "card";
+    c.style.cssText = mine ? "border-color:#4f8cff; background:#18203c" : "";
+    c.innerHTML =
+      "<h3>第 " + rd.period + " 期 · 第 " + rd.round + " 轮 <span class='tag " + st[1] + "'>" + st[0] + "</span></h3>" +
+      "<div class='row'><span>币种 / 状态号</span><b>" + rd.symbol + " / " + rd.status + "</b></div>" +
+      "<div class='row'><span>目标</span><b>" + fmt(rd.targetVote, rd.symbol) + " " + rd.symbol + "</b></div>" +
+      "<div class='row'><span>已筹</span><b class='val-ok'>" + fmt(rd.currentVote, rd.symbol) + "</b></div>" +
+      "<div class='row'><span>个人额度</span><span>" + fmt(rd.minVote, rd.symbol) + " ~ " + fmt(rd.maxVote, rd.symbol) + "</span></div>" +
+      "<div class='row'><span>静态收益</span><b>" + (rd.rewardRate||0) + "</b></div>" +
+      "<div class='bar'><i style='width:" + pct.toFixed(1) + "%'></i></div>" +
+      "<div style='font-size:11px;color:var(--dim)'>" + pct.toFixed(1) + "% · " + new Date(rd.startTime).toLocaleString() + " → " + new Date(rd.endTime).toLocaleTimeString() + "</div>" +
+      "<div style='margin-top:8px'><button class='sm' onclick='demo.selectRound(" + rd.id + ")'>查看 / 投入</button></div>";
+    c.onclick = ()=> demo.selectRound(rd.id);
+    el.appendChild(c);
+  });
+}
+
+function renderDetail(d){
+  $("roundDetailCard").style.display = "block";
+  const el = $("roundDetail");
+  el.innerHTML =
+    "<div class='row'><span>我的余额（" + d.symbol + "）</span><b class='val-ok'>" + d.balance + "</b></div>" +
+    "<div class='row'><span>我已投入</span><b>" + fmt(d.vote, d.symbol) + " " + d.symbol + "</b></div>" +
+    "<div class='row'><span>轮进度</span><b>" + fmt(d.currentVote, d.symbol) + " / " + fmt(d.targetVote, d.symbol) + "</b></div>" +
+    "<div class='row'><span>状态</span><b>" + ((RST[d.status]||[""])[0]) + "</b></div>";
+  const btn = $("voteBtn");
+  btn.disabled = d.status !== 1;
+  btn.textContent = d.status === 1 ? "💰 投入这轮" : "仅进行中的轮可投入";
+  btn.style.background = d.status === 1 ? "var(--warn)" : "#3a4158";
+  $("vmBalance").textContent = d.balance + " " + d.symbol;
+  $("vmSymbol").textContent = d.symbol;
+  $("vmRound").textContent = (state.selected ? state.selected.round : "");
+}
+
+function renderMyVotes(vs){
+  $("myVotesCard").style.display = "block";
+  const el = $("myVotes"); el.innerHTML = "";
+  const list = vs || [];
+  if (!list.length){ el.innerHTML = '<div class="empty">还没有投入记录。</div>'; return; }
+  list.forEach(v=>{
+    const s = document.createElement("div"); s.className = "row";
+    s.innerHTML = "<span>第" + v.period + "期·第" + v.round + "轮 " + v.symbol + "</span><b>" +
+      fmt(v.amount, v.symbol) + "</b><span class='muted'>" + new Date(v.createTime).toLocaleString() + "</span>";
+    el.appendChild(s);
+  });
+}
+
+function renderCommunity(d){
+  if (!d) return;
+  $("cmTotal").textContent = d.totalCount ?? d.total ?? 0;
+  const f1 = (d.f1||[]), f2 = (d.f2||[]), f3 = (d.f3||[]);
+  $("cmF1").textContent = Array.isArray(f1) ? f1.length : (f1||0);
+  $("cmF2").textContent = Array.isArray(f2) ? f2.length : (f2||0);
+  $("cmF3").textContent = Array.isArray(f3) ? f3.length : (f3||0);
+  const list = d.invitedList || d.walletList || [];
+  const el = $("cmList"); el.innerHTML = "";
+  (Array.isArray(list) ? list : []).forEach(x=>{
+    const s = document.createElement("div"); s.className = "row";
+    s.innerHTML = "<span>" + (x.name || x.address || "") + (x.active ? "" : " <span class='muted'>(未激活)</span>") + "</span><span class='mono'>" + (x.address||"").slice(0,12) + "…</span>";
+    el.appendChild(s);
+  });
+  if (!list.length) el.innerHTML = '<div class="empty">伞下暂无成员（用你的邀请码注册一个下级钱包试试）</div>';
+}
+
+function renderNotices(nts){
+  const el = $("notices"); el.innerHTML = "";
+  const list = nts || [];
+  if (!list.length){ el.innerHTML = '<div class="empty">暂无系统消息。</div>'; return; }
+  list.forEach(n=>{
+    const s = document.createElement("div"); s.className = "row";
+    s.innerHTML = "<span>" + (n.content||"") + "</span><span class='muted'>" + new Date(n.createTime).toLocaleString() + "</span>";
+    el.appendChild(s);
+  });
+}
+
+// ---------- 主流程 ----------
+const demo = {
+  async bootstrap(){
+    try{
+      const d = await demoApi("/demo/bootstrap");
+      toast("演示数据就绪 ✓ 种子邀请码 " + d.rootCode + "，进行中轮 ID=" + d.roundId);
+      const info = await demoApi("/demo/status");
+      const c = info.counts || {};
+      $("demoInfo").innerHTML = "钱包 " + c.wallet + " 个 · 轮 " + c.round + " 个 · 投入 " + c.vote + " 条<br>种子钱包：<span class='mono'>" + d.rootAddress + "</span><br>邀请码：<b class='val-warn'>" + d.rootCode + "</b>";
+      $("gwPill").textContent = "npower: " + (info.npower||"").replace("http://","");
+    }catch(e){ toast("初始化失败: " + e.message, "bad"); }
+    this.refreshAll(true);
+  },
+  async regWallet(){
+    if (!state.wallets.some(w=>w.code === "DEMO8888")) await this.bootstrap();
+    const name = "演示用户" + Math.floor(1000 + Math.random()*9000);
+    try{
+      // 说明：本地无链服务(:1527)，演示钱包由网关离线生成（地址本地随机、不走真实链）
+      const d = await demoApi("/demo/register", {code: "DEMO8888", name, password: "123456"});
+      state.wallets.push({name: d.name || name, pwd: "123456", token: d.token,
+                          address: d.address, usdtAddress: d.usdtAddress, code: d.code});
+      state.active = state.wallets.length - 1;
+      save(); renderWallet();
+      toast("新钱包已注册并登录 ✓（口令 123456，邀请码 " + d.code + "）", "okk");
+      this.refreshAll(true);
+    }catch(e){ toast("注册失败: " + e.message, "bad"); }
+  },
+  switchWallet(i){
+    if (i < 0){ state.active = -1; } else { state.active = i; }
+    save(); renderWallet(); this.refreshAll(true);
+  },
+  async faucet(sym){
+    const w = curWallet(); if (!w){ toast("请先创建/切换钱包", "bad"); return; }
+    const amountUnits = {"FIBO":200000,"BOFI":1000,"USDT":10000}[sym];
+    try{
+      const d = await demoApi("/demo/faucet", {address: w.address, symbol: sym, amountUnits});
+      toast("已到账 " + (amountUnits).toLocaleString() + " " + sym + " ✓", "okk");
+      this.refreshInfo();
+    }catch(e){ toast("领币失败: " + e.message, "bad"); }
+  },
+  async refreshInfo(){
+    const w = curWallet(); if (!w){ $("wName").textContent="-"; return; }
+    try{
+      const info = await api("GET", "/wallet/info");
+      if (w){ w.address = info.address || w.address; w.usdtAddress = info.usdtAddress || w.usdtAddress; save(); }
+      renderAssets(info);
+      $("wName").textContent = info.name || w.name;
+      $("wAddr").textContent = info.address || "-";
+      $("wTron").textContent = info.usdtAddress || "-";
+      const codeD = await api("GET", "/self/invitedCode");
+      if (w) w.code = codeD.code;
+      $("wCode").textContent = codeD.code;
+      renderWallet();
+    }catch(e){ if (e.bizCode !== 401) console.warn("info:", e.message); }
+    try{
+      const d = await api("GET", "/self/community");
+      renderCommunity(d);
+    }catch(e){ console.warn("community:", e.message); }
+    try{
+      const vs = await api("GET", "/home/voteList");
+      renderMyVotes(vs);
+    }catch(e){ console.warn("voteList:", e.message); }
+  },
+  async refreshHome(){
+    const w = curWallet();
+    if (!w){ $("roundList").innerHTML = '<div class="empty">先「＋ 新建演示钱包」再查看众筹进度。</div>'; return; }
+    try{
+      const d = await api("GET", "/home");
+      const projs = d.projectList || [];
+      const chips = $("projChips"); chips.innerHTML = "";
+      projs.forEach(p=>{
+        const s = document.createElement("span"); s.className = "wallet-chip";
+        s.textContent = "第" + p.period + "期 · " + p.symbol + " · " + (p.status===1?"进行中":(p.status===2?"已停止":"未开始"));
+        chips.appendChild(s);
+      });
+      const nts = d.notifyList || [];
+      renderNotices(nts);
+      renderRounds(d.roundList);
+      $("homeHint").textContent = "共 " + projs.length + " 期 · " + (d.roundList||[]).length + " 轮";
+    }catch(e){ console.warn("home:", e.message); $("roundList").innerHTML = '<div class="empty">拉取 /home 失败：' + e.message + "</div>"; }
+  },
+  async selectRound(id){
+    state.roundId = id;
+    try{
+      const [d, rl] = await Promise.all([
+        api("GET", "/home/round/" + id),
+        api("GET", "/home")
+      ]);
+      const rd = (rl.roundList||[]).find(x=>x.id===id);
+      state.selected = rd || {id, round:""};
+      renderDetail(d);
+      const cards = document.querySelectorAll("#roundList .card");
+      cards.forEach(c=> c.style.cssText = "");
+    }catch(e){ toast("加载轮详情失败: " + e.message, "bad"); }
+  },
+  voteOpen(){
+    if (!curWallet()){ toast("请先登录钱包", "bad"); return; }
+    if (!state.roundId){ toast("请先选择一轮", "bad"); return; }
+    $("voteModal").classList.add("show");
+    $("voteMsg").textContent = "";
+    this.newCaptcha();
+  },
+  voteClose(){ $("voteModal").classList.remove("show"); },
+  async newCaptcha(){
+    try{
+      const d = await api("GET", "/captcha/getCaptcha", undefined, false);
+      state.capId = d.captchaId;
+      $("vmCap").src = "/api/captcha/show/" + d.captchaId + ".png?t=" + Date.now();
+    }catch(e){ toast("验证码获取失败: " + e.message, "bad"); }
+  },
+  async submitVote(){
+    const w = curWallet();
+    const units = parseFloat($("vmAmount").value);
+    const sol = $("vmCapSol").value.trim();
+    if (!(units > 0)){ toast("请输入投入数量", "bad"); return; }
+    if (!sol){ toast("请输入验证码", "bad"); return; }
+    const sym = $("vmSymbol").textContent;
+    $("voteMsg").textContent = "提交中…";
+    try{
+      // 主单位提交（币数量，非最小单位）：后端 /wallet/vote 内部 amount×SymbolDictionary 折算
+      await api("POST", "/wallet/vote", {
+        roundId: state.roundId, amount: units, pwd: w.pwd,
+        captchaId: state.capId, captchaSolution: sol
+      });
+      toast("投入成功 ✓（数量 " + units.toLocaleString() + " " + sym + "）", "okk");
+      this.voteClose(); $("vmCapSol").value = "";
+      this.refreshAll(true);
+    }catch(e){
+      $("voteMsg").textContent = "失败: " + e.message;
+      toast("投入失败: " + e.message, "bad");
+      this.newCaptcha();
+    }
+  },
+  async refreshAll(force){
+    const w = curWallet();
+    const info = await demoApi("/demo/status");
+    $("demoInfo").innerHTML = "钱包 " + (info.counts?.wallet||0) + " 个 · 轮 " + (info.counts?.round||0) + " 个 · 投入 " + (info.counts?.vote||0) + " 条";
+    try{
+      const r = await api("GET", "/home/version", undefined, false);
+      setStatus(true, "npower 在线 · 主服务 :3000");
+    }catch(e){
+      setStatus(false, "npower 未就绪: " + e.message);
+    }
+    await this.refreshHome().catch(()=>{});
+    if (w) await this.refreshInfo().catch(()=>{});
+    else { $("wName").textContent="-"; $("assetList").innerHTML='<div class="empty">登录后显示</div>'; }
+  }
+};
+
+function setStatus(ok, txt){
+  const dot = $("stDot"); dot.className = "dot " + (ok ? "ok" : "bad");
+  $("stTxt").textContent = txt;
+}
+
+(async function init(){
+  load(); renderWallet();
+  // 状态探测 & 首页
+  setStatus(false, "检测 npower 中…");
+  try{
+    const s = await demoApi("/demo/status");
+    $("gwPill").textContent = "npower: " + (s.npower||"").replace("http://","");
+  }catch(e){}
+  await demo.bootstrap();
+  setInterval(()=>{
+    if (document.hidden) return;
+    if (document.querySelector("#voteModal.show")) return; // 弹窗时不打扰验证码
+    demo.refreshAll().catch(()=>{});
+  }, 5000);
+})();
+</script>
+
+<script>
+"use strict";
+// ================= 千万次扩展面板（算力矿机 / 测试工具） =================
+// 依赖主脚本提供的全局工具：$、toast、logRaw、api、demoApi、curWallet、DEC。
+const ext = {
+  SYMS: ["FIBO","USDT","BOFI","KTO","FUSD","PCB"],
+  nf(v, d){ return Number(v||0).toLocaleString("zh-CN", {maximumFractionDigits:(d==null?4:d)}); },
+  fillSelects(){
+    const sel1 = $("feeSymSel"), sel2 = $("wdSymIn");
+    for (const el of [sel1, sel2]) {
+      if (!el || el.options.length) continue;
+      ext.SYMS.forEach(s=>{ const o = document.createElement("option"); o.value = s; o.textContent = s; el.appendChild(o); });
+    }
+  },
+  requireWallet(){
+    const w = curWallet();
+    if (!w) { toast("请先登录一个钱包（左上角创建/切换）", "bad"); return null; }
+    return w;
+  },
+  async refreshHash(){
+    const w = ext.requireWallet(); if (!w) return;
+    const card = $("hashpowerCard"); if (card) card.style.display = "block";
+    try{
+      const d = await api("GET", "/hashpower/home");
+      $("hpPower").textContent = ext.nf(d.totalPower) + " U 算力";
+      $("hpReward").textContent = ext.nf(d.totalReward, 6);
+      $("hpRemain").textContent = ext.nf(d.remainReward, 6);
+      const el = $("hpList"); el.innerHTML = "";
+      const list = d.accountList || [];
+      if (!list.length){ el.innerHTML = '<div class="empty">暂无算力账户 —— 轮次失败(倒2/倒3)结算时按爆仓价折算生成，本地需 round 结算后可见。</div>'; return; }
+      const MODE = {0:["默认三倍出局","t1"],1:["300天三倍","t2"],2:["TM加速","t2"]};
+      list.forEach(a=>{
+        const m = MODE[a.mode] || ["mode"+a.mode,"t0"];
+        const st = a.status === 1 ? "已出局" : "挖矿中";
+        const div = document.createElement("div"); div.className = "row";
+        div.innerHTML =
+          "<span>#"+a.id+" <span class='muted'>"+ (a.symbol||"-") +"</span><br><span class='mono'>算力 "+ ext.nf(a.power,4) +" U · 爆仓价 "+ ext.nf(a.price,4) +" U</span></span>" +
+          "<span><span class='tag "+(m[1])+"'>"+m[0]+"</span> "+st+"<br>累计 "+ext.nf(a.totalReward,6)+" · 可提 <b class='val-ok'>"+ext.nf(a.remainReward,6)+"</b></span>";
+        el.appendChild(div);
+      });
+    }catch(e){ toast("算力矿机拉取失败: " + e.message, "bad"); }
+  },
+  async withdrawHash(){
+    const w = ext.requireWallet(); if (!w) return;
+    const units = parseFloat($("hpAmount").value);
+    const pwd = $("hpPwd").value.trim();
+    if (!(units > 0)) { toast("请输入提取数量", "bad"); return; }
+    if (!pwd) { toast("请输入钱包口令", "bad"); return; }
+    try{
+      await api("POST", "/hashpower/withdraw", {amount: units, pwd});
+      toast("提取成功 ✓ 请到资产页查看 FIBO", "okk");
+      $("hpPwd").value = "";
+      ext.refreshHash();
+    }catch(e){ toast("提取失败: " + e.message, "bad"); }
+  },
+  async estFee(){
+    const w = ext.requireWallet(); if (!w) return;
+    const symbol = $("feeSymSel").value;
+    const amount = parseFloat($("feeAmtIn").value);
+    if (!(amount > 0)) { toast("请输入金额", "bad"); return; }
+    try{
+      const fee = await api("GET", "/wallet/fee/" + symbol + "/" + amount);
+      $("feeRes").textContent = "≈ " + ext.nf(fee, 6) + " 手续费币（默认 BOFI，可配置 FeeSymbol）";
+    }catch(e){ $("feeRes").textContent = "失败: " + e.message; }
+  },
+  async listTx(){
+    const w = ext.requireWallet(); if (!w) return;
+    const symbol = $("txSymIn").value.trim() || "FIBO";
+    const dir = $("txDirIn").value;
+    try{
+      const list = await api("GET", "/wallet/tx/" + symbol + "/" + dir);
+      const box = $("txRes");
+      if (!Array.isArray(list) || !list.length){ box.innerHTML = '<div class="empty">该币种暂无流水。</div>'; box.style.display = "block"; return; }
+      let html = "<table><tr><th>方向</th><th>类型</th><th>数量</th><th>时间</th></tr>";
+      list.forEach(t=>{
+        html += "<tr><td>" + (t.in ? "转入" : "转出") + "</td><td>" + (t.desc||"") + "</td><td class='num'>" + ext.nf(t.amount, 4) + "</td><td class='muted'>" + (t.createTime ? new Date(t.createTime).toLocaleString() : "-") + "</td></tr>";
+      });
+      html += "</table>";
+      box.innerHTML = html; box.style.display = "block";
+    }catch(e){ $("txRes").innerHTML = '<div class="empty">拉取失败: ' + e.message + "</div>"; $("txRes").style.display = "block"; }
+  },
+  showTxBox(show){ $("txRes").style.display = show ? "block" : "none"; },
+  async withdrawCoin(){
+    const w = ext.requireWallet(); if (!w) return;
+    const symbol = $("wdSymIn").value;
+    const to = $("wdAddrIn").value.trim();
+    const amount = parseFloat($("wdAmtIn").value);
+    const pwd = $("wdPwdIn").value.trim();
+    if (!to || !(amount > 0) || !pwd){ toast("请填齐地址/数量/口令", "bad"); return; }
+    try{
+      await api("POST", "/wallet/withdraw", {address: to, symbol, amount, pwd});
+      toast("已提交上链 ✓", "okk");
+    }catch(e){
+      toast("提币失败: " + e.message, "bad");
+      logRaw("withdraw-err", e.message);
+    }
+  }
+};
+
+(async function extInit(){
+  ext.fillSelects();
+  setInterval(()=>{
+    if (document.hidden) return;
+    if (curWallet()) ext.refreshHash().catch(()=>{});
+  }, 6000);
+  if (curWallet()) ext.refreshHash().catch(()=>{});
+})();
+</script>
+</body>
+</html>

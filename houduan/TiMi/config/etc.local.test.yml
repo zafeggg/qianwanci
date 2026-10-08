@@ -1,0 +1,23 @@
+HttpPort: ":3002"
+secretKey: "dsajflkadsjglafsdj"
+LogPath: npower_local.log
+Mysql:
+  Dns: root:123456@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  # 本机 Redis 未设密码，留空（详见 etc.local.yml 注释）
+  Password: ""
+  Db: 5
+KtoPool:
+  privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+  Address: KtoC8VAmLjrzL1MCXgWskJjJABnQbMr1QWTPrYfmgMDPPvL
+  Private: ""   # 已迁出：见 KTO_POOL_PRIVATE_KEY（config/secrets.local.env）
+TronPool:
+
+  privateKeyEnv: "TRON_POOL_PRIVATE_KEY"
+  Address: TR7buqoSAxST1YfBwno9D6n8S2JUQDahDP
+  Private: ""   # 已迁出：见 TRON_POOL_PRIVATE_KEY（config/secrets.local.env）
+TronNetwork:
+  Host: http://localhost:1527
+
+apiAuthKey: "testkey123"

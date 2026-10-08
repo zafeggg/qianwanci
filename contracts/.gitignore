@@ -1,0 +1,9 @@
+node_modules/
+cache/
+artifacts/
+.env
+.env.local
+*.log
+deployments/*.local.json
+# 本地私链（hardhat node）部署记录：每次重启节点都会换地址，没有入库价值
+deployments/localhost.json

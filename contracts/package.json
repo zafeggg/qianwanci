@@ -1,0 +1,35 @@
+{
+  "name": "qianwanci-contracts",
+  "version": "1.0.0",
+  "description": "千万次（TiMi）链上合约 - FIBONACCI 链（chainId 12306）",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy-fibo.js --network hardhat",
+    "deploy:fibo": "hardhat run scripts/deploy-fibo.js --network fibo",
+    "verify:fibo": "hardhat verify --network fibo",
+    "node": "hardhat node",
+    "node:local": "hardhat node --hostname 127.0.0.1 --port 8545",
+    "deploy:localnode": "hardhat run scripts/deploy-fibo.js --network localhost",
+    "mint:localnode": "hardhat run scripts/mint-initial.js --network localhost",
+    "prepare:localnode": "node --require ./node_modules/hardhat/register ./scripts/prepare-local.js",
+    "accounts:localnode": "node --require ./node_modules/hardhat/register ./scripts/print-accounts.js",
+    "clean": "hardhat clean"
+  },
+  "keywords": [
+    "TiMi",
+    "千万次",
+    "TM",
+    "FIBO"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "5.0.0",
+    "chai": "^4.3.7",
+    "dotenv": "^16.6.1",
+    "ethers": "^6.9.0",
+    "hardhat": "^2.19.0"
+  }
+}

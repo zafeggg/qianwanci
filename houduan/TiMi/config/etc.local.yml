@@ -1,0 +1,31 @@
+HttpPort: ":3000"
+secretKey: "dsajflkadsjglafsdj"
+LogPath: npower_local.log
+Mysql:
+  Dns: root:123456@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  # 本机 Redis 3.0.504 未设 requirepass（与旧开发机不同），此处留空；
+  # 若本机 Redis 已设密码，改回 "123456" 或对应值即可
+  Password: ""
+  Db: 5
+KtoPool:
+  privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+  Address: KtoC8VAmLjrzL1MCXgWskJjJABnQbMr1QWTPrYfmgMDPPvL
+  Private: ""   # 已迁出：见 KTO_POOL_PRIVATE_KEY（config/secrets.local.env）
+TronPool:
+
+  privateKeyEnv: "TRON_POOL_PRIVATE_KEY"
+  Address: TR7buqoSAxST1YfBwno9D6n8S2JUQDahDP
+  Private: ""   # 已迁出：见 TRON_POOL_PRIVATE_KEY（config/secrets.local.env）
+TronNetwork:
+  Host: http://localhost:1527
+# 链服务端点（2026-09-18 新增，原先硬编码在 utils/kto/kto.go）
+# 本地无链环境：KTO gRPC 与 FIBO RPC 均不可达，/health 会显示 degraded（非关键依赖，不影响 /api 记账语义）
+Chain:
+  KtoGrpcAddr: "106.12.94.134:8545"
+  FiboRpcUrl: "https://network.hzroc.art"
+  FiboChainId: 12306
+  FiboExplorer: "https://hzroc.art"
+  TmContract: ""
+  Confirmations: 12

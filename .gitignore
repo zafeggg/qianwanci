@@ -1,0 +1,63 @@
+# ============================================================
+#  千万次（TiMi）仓库根 .gitignore
+#  子项目另有自己的 .gitignore：
+#    dapp-vue/.gitignore     前端（node_modules/dist/.workbuddy/.env.*）
+#    contracts/.gitignore    合约（node_modules/cache/artifacts/.env）
+# ============================================================
+
+# ---- 依赖 ----
+node_modules/
+
+# ---- 构建产物 ----
+build/
+dist/
+*.exe
+
+# 旧存档 houduan/crowd-master-*/deploy/ 只放 Linux 交叉编译产物
+houduan/*/deploy/
+
+# 与源码同目录的无扩展名 Go 二进制（cmd/<pkg>/<二进制名>），源码 .go 仍入库
+houduan/*/cmd/*/burn
+houduan/*/cmd/*/collecting
+houduan/*/cmd/*/demo
+houduan/*/cmd/*/hashpower
+houduan/*/cmd/*/manual
+houduan/*/cmd/*/mining
+houduan/*/cmd/*/ops
+houduan/*/cmd/*/round
+houduan/*/cmd/*/trshash
+
+# ---- 日志 ----
+*.log
+
+# ---- 代理工作区（记忆 / 截图 / 验证脚本；沿用 dapp-vue 既有约定不入库）----
+.workbuddy/
+
+# ---- 本机构建缓存（若把 GOCACHE/GOMODCACHE/GOPATH 指到工作区内）----
+.gocache/
+.gomodcache/
+.gopath/
+
+# ---- 私钥证书（2026-10-08）----
+# crypto/private.pem 是原生报文加密的 RSA 私钥：本地文件保留（服务照常运行），只是 git 不再跟踪。
+# 部署时按 千万次-生产部署清单.md §3.1 手动放置；public.pem / server_pkix.pem 是公钥，允许入库。
+**/crypto/private.pem
+**/private.pem
+
+# ---- 编辑器 / 系统 ----
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 本地诊断输出（npower 启动日志抓取；可能落在仓库根或 houduan/TiMi）
+np-start.*
+# ==================== 密钥文件（2026-09-30）====================
+# secrets*.env 是**本机/生产**的真实密钥，绝不入库；只提交 secrets.env.example 模板。
+houduan/TiMi/config/secrets*.env
+!houduan/TiMi/config/secrets.env.example
+# 本地私密覆盖（如 .env.local、*.local.yml 的自定义密钥版本）
+*.local.env

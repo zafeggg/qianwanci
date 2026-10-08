@@ -1,0 +1,9 @@
+HttpPort: ":5000"
+SecretKey: "dsajflkadsjglafsdjiii"
+LogPath: crowd.log
+Mysql:
+  Dns: root:123456@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  Password: "123456"
+  Db: 5

@@ -1,0 +1,21 @@
+# burn 手续费销毁程序配置（N次方新增）
+# 用途：汇总 fee_burn 表 status=0 的手续费，从 KtoPool（资金池）链上转出到黑洞地址销毁，
+#       直至 TM 流通量仅剩 7777 枚（通缩设计，BurnTarget 见 core/impl/config.go）。
+# 部署：Linux amd64 交叉编译后 nohup ./burnRun -f ./burn.yml 常驻运行（默认每小时执行一次）。
+LogPath: burn.log
+Mysql:
+  Dns: root:12345678@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  Password: "123456"
+  Db: 5
+# 资金池（销毁资金来源）：手续费在提币时已从用户账本扣减，此池持有对应链上手续费币（impl.FeeSymbol，TiMi 基准为 TM）用于销毁
+KtoPool:
+  privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+  Address: KtoC8VAmLjrzL1MCXgWskJjJABnQbMr1QWTPrYfmgMDPPvL
+  Private: ""   # 已迁出：见 KTO_POOL_PRIVATE_KEY（config/secrets.local.env）
+# 销毁目标：黑洞地址（部署前必须替换为链上真实黑洞地址；若留空则使用 burn.go 内占位地址）
+Burn:
+
+  privateKeyEnv: "BURN_EVM_PRIVATE_KEY"
+  Address: ""

@@ -1,0 +1,17 @@
+# hashpower 算力矿机定时任务配置（N次方新增）
+# 用途：按 cron 周期执行算力矿机每日产币（DailyReward）：
+#       矿池日产出 = FIBO 每日区块总产出 × 0.3；个人 = 矿池日产出 × (个人算力/总算力)；
+#       模式1/2 保底 = (算力×3)/300/4h均价；金本位出局 = 累计产出价值 ≥ 算力×3。
+# 部署：Linux amd64 交叉编译后 nohup ./hashpowerRun -f ./hashpower.yml 常驻运行（默认每天 00:30 产币）。
+LogPath: hashpower.log
+Mysql:
+  Dns: root:12345678@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  Password: "123456"
+  Db: 5
+# 产币发放来源（流水 From 展示用），无需链上转账，产出为内部账本入账
+KtoPool:
+  privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+  Address: KtoC8VAmLjrzL1MCXgWskJjJABnQbMr1QWTPrYfmgMDPPvL
+  Private: ""   # 已迁出：见 KTO_POOL_PRIVATE_KEY（config/secrets.local.env）

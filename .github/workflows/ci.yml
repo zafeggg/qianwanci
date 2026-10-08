@@ -1,0 +1,118 @@
+# 千万次（TiMi）CI —— 后端编译/静态检查/单测 + 前端构建 + 合并请求守卫
+#
+# 背景（2026-09-30 补）：此前仓库**没有任何 CI**，回归全靠人工在私链上跑脚本；
+# 而 `go test ./...` 长期是红的（1 个错误导入 + 4 个硬编码原作者路径的用例），
+# 导致"测试没通过"这件事完全不会阻止合并。现在至少把**不需要链与数据库**的部分自动化。
+#
+# 说明：
+# - 连库/连链的集成用例在本 CI 中会自动跳过（它们要求 NPOWER_TEST_CONFIG 且依赖 MySQL/Redis），
+#   属预期行为；私链 E2E 仍在本地由 scripts/privchain-*.ps1 人工执行。
+# - 依赖从网络拉取（go mod / npm ci）；本机离线开发请用仓库内 .gomodcache（见 README）。
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: 后端（build / vet / test）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: houduan/TiMi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          # 仓库未提交 go.sum 之外的缓存，交给 setup-go 缓存
+          cache-dependency-path: houduan/TiMi/go.sum
+      - name: 编译全部包
+        run: go build ./...
+      - name: 静态检查
+        run: go vet ./...
+      - name: 单元测试（集成用例自动跳过）
+        run: go test -count=1 ./...
+      - name: 生产二进制可交叉编译（Linux 静态）
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /tmp/npower ./cmd
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /tmp/round ./cmd/round
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /tmp/evmwatch ./cmd/evmwatch
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /tmp/burn ./cmd/burn
+
+  contracts:
+    name: 合约（编译 / 单测）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+      - run: npm ci
+      - name: 合约单测（硬帽内置网络，不依赖私链）
+        run: npx hardhat test
+
+  frontend:
+    name: 前端（构建 / 纯逻辑单测）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dapp-vue
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: dapp-vue/package-lock.json
+      - run: npm ci
+      - name: 纯逻辑单测（node:test，无额外依赖）
+        run: npm test
+      - name: 生产构建
+        # 生产构建必须显式注入后端域名，否则会打出占位域名（应用会显示阻塞横幅）
+        env:
+          VITE_API_BASE: https://api.example.invalid
+        run: npm run build
+      - name: 构建产物必须包含 PWA 文件
+        run: |
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          test -f dist/icon-192.png
+          test -f dist/icon-512.png
+
+  guard:
+    name: 仓库守卫（明文私钥体检）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 扫描明文私钥/口令
+        # ⚠ 这里刻意用 warning 而不是 error：仓库里**确实还残留**历史明文私钥
+        #   （houduan/TiMi/config/*.yml），处置权在 owner（轮换 + git 历史清理，见部署清单 §3.1）。
+        #   在轮换完成前把 CI 设成红灯只会训练大家忽略 CI；轮换完成后应把 warning 改成 error。
+        run: |
+          set +e
+          found=0
+          # 1) 配置目录里的明文私钥字段（历史遗留，轮换后应清零）
+          if grep -rnE '^\s*(Private|EvmPrivate|HotWalletPrivate)\s*:\s*["'"'"']?[0-9a-zA-Z]{32,}' houduan/TiMi/config/ ; then
+            echo "::warning title=明文私钥::houduan/TiMi/config 下仍有明文私钥，上线前必须改为 privateKeyEnv 注入并轮换密钥（见 千万次-生产部署清单.md §3.1）"
+            found=1
+          fi
+          # 2) 生产模板里的 apiAuthKey/secretKey 不应是示例值
+          if grep -rnE '^(apiAuthKey|SecretKey|secretKey)\s*:\s*["'"'"'](dsajflkadsjglafsdj|testkey123|privchain-apikey)' houduan/TiMi/config/etc.yml ; then
+            echo "::warning title=示例凭据::生产模板仍含示例凭据（Mode=prod 时会被启动体检拦下，但也请改成真实随机值）"
+            found=1
+          fi
+          if [ "$found" = "1" ]; then
+            echo "体检发现待处置项（不阻塞构建，详见上方 warning）"
+          else
+            echo "未发现明文私钥/示例凭据"
+          fi
+          exit 0

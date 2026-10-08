@@ -1,0 +1,138 @@
+HttpPort: ":3000"
+secretKey: "privchain-local-secret"
+# Mode 留空 = 不注册 /ops/test/* 测试路由（npower 本身没有 Mode 分支路由，保留位）
+Mode: "dev"
+# /api 适配层鉴权：私链联调固定值，前端 .env.development 的 VITE_API_KEY 需一致；留空=不校验
+apiAuthKey: "privchain-apikey"
+LogPath: privchain_npower.log
+
+# 独立测试库：不要复用 crowd_local（那里有 2026-09-18 主网只读验证留下的 EVMTEST01 与 2 笔真实充值记录，
+# 以及历史重复轮号 project=1 round=2）。从零建库还能顺带验证「新建库唯一约束不丢」这条历史坑。
+Mysql:
+  Dns: root:123456@tcp(127.0.0.1:3306)/crowd_privchain?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+
+Redis:
+  Addr: "localhost:6379"
+  Password: ""
+  # ⚠ 私链测试必须换库！默认 5 与 crowd_local 共用，会串到本地演示环境的会话/参数/进度键
+  Db: 6
+
+# ==================== 链端点：本地 hardhat 私链 ====================
+# 由 contracts/scripts/prepare-local.js 生成，节点重启后地址会变，需重新部署并更新本段
+Chain:
+  KtoGrpcAddr: ""                      # 私链不使用 KTO；留空走历史兜底值，/health 会显示 degraded
+  FiboRpcUrl: "http://127.0.0.1:8545"
+  FiboChainId: 31337                   # ⚠ 必须与节点一致，否则出金交易签名链 ID 不符被拒
+  TmContract: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  Confirmations: 1                     # ⚠ 私链必须调小：hardhat 仅在有交易时出块，12 会让监听等 12 笔交易
+  # 充值监听目标（cmd/evmwatch 不带 -token/-pool 时取这两个值）
+  WatchToken: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  # ⚠ 充值入账对象（决定充值模型，配错=所有用户的充值都记到同一个账户）：
+  #   recipient（默认）= 记到**收款地址**对应账户，适合「每人一个专属充值地址」
+  #   sender          = 记到**付款地址**对应账户，适合「所有人共用一个收款池」——DApp 给所有用户
+  #                     展示的就是同一个地址，所以私链/DApp 口径用 sender。
+  #   from==pool / 自转 / mint 已被监听过滤，故 sender 不会把出金误当充值。
+  DepositCreditTo: "sender"
+  # 充值监听起始块（2026-09-30 新增）：无扫块进度时从这里开始扫。
+  # 私链联调一律显式传 -fromBlock 1；这里再给一个兜底值，避免忘记传参时监听拒绝启动。
+  WatchStartBlock: 1
+  # 仅联调逃生开关：允许"无进度时从最新块开始"（=不补扫历史）。生产必须为 false。
+  AllowStartFromLatest: true
+  # ⚠ 私链地址分工（三个角色**必须互不相同**，否则监听会误判）：
+  #
+  #   1) 测试用户    0x7099…（账户[1]）—— 链上与库里都是**同一条钱包记录**：
+  #       通过 /api/auth/login 首登注册，Address 与 EvmAddress 都写这个 EVM 地址。
+  #       **充值收款地址必须是它**：监听按「to == 收款地址」查 wallet 表入账，
+  #       to 指向一个不是用户的钱包（例如资金池）只会得到「收款地址无对应用户，跳过」。
+  #   2) 出金热钱包  0x3C44…（账户[2]，见 Withdraw.HotWalletPrivate）—— 只负责把 TM 转给用户；
+  #       必须与充值地址分离：同址时出金交易（池→用户）会被 from==pool 规则挡掉或误判。
+  #   3) 手续费池    Burn.EvmFrom（下方 TronPool.Address，账户[0]）—— 持有手续费 TM 并执行 burn。
+  #
+  # 因此私链联调的口径是：
+  #   用户在链上自持 TM（dev 环境由 scripts/privchain-chain.mjs 定向发放）并把它当作「充值账户」，
+  #   真实外部钱包充值的完整流程（用户从自己的钱包转入收款地址）在私链上等价于：
+  #   直接给该用户的链上地址 mint/转账后，再用 -fromBlock 重扫认账。
+  WatchPool: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+
+# ==================== 资金通道（出金） ====================
+Withdraw:
+  Mode: "broadcast"                    # 私链联调开启出金广播；生产口径待 owner 拍板
+  # ⚠ 只有 ChainAsset 指定的资产允许链上出金，其他资产一律拒绝（fail-closed）。
+  # 不这样限制的话，「提 USDT」会按 USDT 的数量转出 TokenContract 里那个代币（资产/合约错配，
+  # 2026-09-19 私链实测暴露）。以后接多资产时改用 AssetContracts 映射。
+  ChainAsset: "TM"
+  # 出金热钱包私钥的两种给法（优先级：环境变量 > 下面这行明文）：
+  #   推荐——设 HotWalletKeyEnv 为某个环境变量的名字，私钥只放在环境变量/KMS 里，yml 留空：
+  #     HotWalletKeyEnv: "TITI_HOT_WALLET_PK"
+  # 本地/私链——明文写在下行。⚠ yml 已入库，生产用这种方式等于把私钥随 git 历史一起泄漏。
+  # 出金热钱包 = hardhat 账户[2]（与充值地址 0x7099… 分离，见 Chain.WatchPool 注释）
+  # 验证脚本：scripts\privchain-hotwallet-env.ps1（用 evmwatch 的启动体检日志确认生效）
+  # [hardhat-public-test-key] hardhat 标准测试账户私钥（公开值，仅私链联调，无真实资金）
+  HotWalletPrivate: "5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a" # [hardhat-public-test-key]
+  TokenDecimals: 8
+  TokenContract: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  # 多资产映射示例（当前私链只有 TM 一个代币，留空）
+  # AssetContracts:
+  #   TM: "0x..."
+  # AssetDecimals:
+  #   TM: 8
+
+# ==================== 手续费销毁 ====================
+# 千万次手续费币 TM 是 ERC20，走 EVM 的 burn(uint256)；合约层强制流通量不低于 7777 枚
+Burn:
+  Address: ""                          # EVM 通道不需要黑洞地址
+  Chain: "evm"
+  EvmFrom: ""                          # 留空回落 TronPool.Address（= 充值池 0xf39F…，TM 都在它手上）
+  # [hardhat-public-test-key] hardhat 账户[0]（公开值，仅私链联调）
+  EvmPrivate: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # [hardhat-public-test-key]
+
+# 手续费池地址：EVM 销毁通道用它作为 burn 的出资方（Burn.EvmFrom 留空时取这里）
+# 初始发行的 TM 全在账户[0]手上，所以销毁也从它发起
+TronPool:
+  Address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  Private: ""
+  # privateKeyEnv: "TRON_POOL_PRIVATE_KEY"   # 私链用不到；生产用环境变量注入
+
+# KTO 通道在私链不使用；保持空值，避免误触碰任何真实节点
+KtoPool:
+  Address: ""
+  Private: ""
+  # privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+TronNetwork:
+  Host: "http://localhost:1527"
+# 已删除的死配置（2026-09-30）：BofiPool / MinePool / TronNode（全仓无消费者）
+
+# ==================== 钱包签名登录（A 模块） ====================
+
+Auth:
+  ChainId: 31337                       # 与 Chain.FiboChainId 一致，签名原文里的 ChainId 行
+  Brand: "TiMi"
+  NonceTTLSeconds: 300
+  SessionTTLSeconds: 604800
+  RequireInviteCode: false
+  # EnforceSession：true 时**读接口**也要求会话票（写接口始终要求，见 Auth.AllowUnsignedWrite）。
+  # 私链联调保持 false，便于脚本直接按地址查询资产。
+  EnforceSession: false
+  # AllowUnsignedWrite：**仅联调**开关（2026-09-30 新增）。
+  # 私链脚本用 SQL 直接造几百个"只有地址、没有私钥"的参与者，无法走钱包签名登录，
+  # 因此这里置 true 让写请求沿用 body 地址；Mode=prod 时该开关被强制忽略，生产不生效。
+  AllowUnsignedWrite: true
+
+# ==================== 运维后台凭据（E 模块 fail-closed） ====================
+# 未配置即拒绝登录；私链用固定测试口令
+Ops:
+  Account: "ops"
+  Password: "privchain-ops-pwd"
+
+# ==================== 幂等 ====================
+Idempotency:
+  RequireKey: false                    # 私链联调保持可选，避免每个请求都要造 key
+  TTLSeconds: 600
+
+# 手续费币种由 core/impl/config.go 的 FeeSymbol 决定（默认 TM）；
+# 如需覆盖走 config 表 params 或此处 Params 段（见 千万次-迭代0参数化与运维说明.md）
+# 运行参数覆盖（NpowerParams 必须写在 Params 段内；写在顶层不会生效 —— 实测踩过）
+Params:
+  # 提现额度：owner 2026-09-30 敲定「100 个起提」（代码默认值即 100）。
+  # ⚠ 私链联调显式关闭（-1 = 取消校验），否则 E2E/额度脚本里 1~10 枚的小额提现会被拦下。
+  WithdrawMinAmount: -1

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>千万次 · 简易运维后台</title>
+<style>
+  :root{
+    --bg:#10141f; --panel:#171c2c; --panel2:#1e2540; --line:#2b3558;
+    --tx:#e9eefb; --dim:#8fa1c9; --acc:#4f8cff; --ok:#2ecc71; --warn:#f5b041; --bad:#e74c3c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg); color:var(--tx); font:14px/1.5 "Microsoft YaHei",system-ui,sans-serif; padding:16px; max-width:1080px; margin:0 auto}
+  h1{font-size:20px; margin-bottom:4px}
+  header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+  .pill{background:var(--panel2); border:1px solid var(--line); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--dim)}
+  .dot{display:inline-block; width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px}
+  .card h2{font-size:15px; margin-bottom:10px; color:#c8d4f4; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .card h2 .right{margin-left:auto; display:flex; gap:8px}
+  input,select,button{font-size:13px}
+  input,select{background:#0e1324; border:1px solid var(--line); color:var(--tx); border-radius:7px; padding:6px 9px; outline:none}
+  input:focus{border-color:var(--acc)}
+  button{background:var(--acc); color:#fff; border:0; border-radius:7px; padding:6px 12px; cursor:pointer}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:transparent; border:1px solid var(--line); color:var(--dim)}
+  button.sm{padding:3px 8px; font-size:12px}
+  button.warn{background:var(--warn); color:#222}
+  button.bad{background:var(--bad)}
+  .row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:7px 0}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:8px 14px}
+  .fld label{display:block; font-size:12px; color:var(--dim); margin:6px 0 2px}
+  .fld input{width:100%}
+  .fld .hint{font-size:11px; color:var(--dim)}
+  .msg{padding:8px 12px; border-radius:8px; margin-top:8px; font-size:13px; display:none; word-break:break-all}
+  .msg.show{display:block}
+  .msg.okk{background:#12341f; color:#8fe3b0; border:1px solid #2a7a4a}
+  .msg.err{background:#3a1f1f; color:#f5a3a3; border:1px solid #8c3a3a}
+  .mono{font-family:Consolas,monospace; font-size:11px; color:var(--dim); word-break:break-all}
+  table{width:100%; border-collapse:collapse; font-size:12px; margin-top:6px}
+  th,td{padding:4px 6px; text-align:left; border-bottom:1px solid #1d2742; white-space:nowrap}
+  th{color:var(--dim); font-weight:normal}
+  details{margin-top:8px}
+  .muted{color:var(--dim); font-size:12px}
+  code{background:#0b0f1f; color:#b9c6ea; padding:1px 6px; border-radius:5px; font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠 千万次 · 简易运维后台</h1>
+  <span class="pill"><span id="stDot" class="dot bad"></span><span id="stTxt">未登录</span></span>
+  <div style="margin-left:auto; display:flex; gap:8px">
+    <a href="/" style="color:var(--acc); font-size:13px">← 返回演示台</a>
+  </div>
+</header>
+
+<!-- 登录 -->
+<div class="card" id="loginCard">
+  <h2>登录（ops 服务）</h2>
+  <div class="row">
+    <input id="opsBase" value="http://127.0.0.1:5000" style="width:230px" title="ops 服务地址" />
+    <input id="acct" value="blx" style="width:140px" placeholder="账号" />
+    <input id="pwd" type="password" value="" placeholder="口令" style="width:180px" />
+    <button onclick="adm.login()">登录</button>
+    <span class="muted">token 存于 localStorage；默认账号口令见 cmd/ops（勿在生产明文使用）</span>
+  </div>
+</div>
+
+<!-- 运行参数 -->
+<div class="card" id="paramsCard" style="display:none">
+  <h2>⚙️ 运行参数（config 表 params，键名见 config/params.go）
+    <span class="right">
+      <button class="ghost sm" onclick="adm.loadParams()">读取</button>
+      <button class="warn sm" onclick="adm.saveParams()">保存并生效*</button>
+      <button class="ghost sm" onclick="adm.resetParams()">清空(恢复默认)</button>
+    </span>
+  </h2>
+  <div class="muted">*数值 0 / 空串 = 不覆盖默认值；保存后仅 ops 进程热加载，npower/round/hashpower/burn 需重启生效。默认值：静态13%、动态1.5/2/2.5%、团队0.5/1/1.5%、扣损50%、费率3%(BOFI)、F1=10直推/30伞下、算力3倍/0.3池占比/300天、销毁目标7777、阶段1。</div>
+  <div class="grid" id="paramFields"></div>
+  <div class="msg" id="paramsMsg"></div>
+</div>
+
+<!-- 算力矿机模式 -->
+<div class="card" id="hpModeCard" style="display:none">
+  <h2>💠 算力矿机模式（0 默认三倍 / 1 最长300天 / 2 TM加速）</h2>
+  <div class="row">
+    <input id="hpId" type="number" placeholder="账户 id" style="width:120px" />
+    <span class="muted">或</span>
+    <input id="hpAddr" placeholder="钱包地址（KTO）" style="width:320px" />
+    <select id="hpMode"><option value="0">0 默认三倍出局</option><option value="1">1 最长300天三倍</option><option value="2">2 TM加速</option></select>
+    <button onclick="adm.setHpMode()">设置模式</button>
+  </div>
+  <div class="msg" id="hpModeMsg"></div>
+</div>
+
+<!-- 快捷运维 -->
+<div class="card" id="quickCard" style="display:none">
+  <h2>🚀 快捷运维（慎用：结算/改级为资金操作）</h2>
+  <div class="row">
+    <span>EndRound</span>
+    <input id="erRound" type="number" placeholder="roundId" style="width:110px" />
+    <select id="erAct">
+      <option value="Success">Success（成功结算）</option>
+      <option value="FailedNormal">FailedNormal（失败100%退）</option>
+      <option value="Failed">Failed（倒2倒3扣50%折算算力）</option>
+    </select>
+    <button class="warn" onclick="adm.endRound()">执行结束/结算</button>
+  </div>
+  <div class="row">
+    <span>SetLevel</span>
+    <input id="slAddr" placeholder="钱包地址(KTO/TRON)" style="width:300px" />
+    <select id="slLevel"><option value="1">F1</option><option value="2">F2</option><option value="3">F3</option></select>
+    <button class="ghost" onclick="adm.setLevel()">设置等级</button>
+  </div>
+  <div class="msg" id="quickMsg"></div>
+</div>
+
+<div class="card">
+  <details open>
+    <summary style="cursor:pointer; color:#c8d4f4; font-weight:bold">🐞 请求日志</summary>
+    <pre id="rawLog" style="background:#0b0f1f; color:#b9c6ea; padding:10px; border-radius:8px; max-height:200px; overflow:auto; font-size:11px; margin-top:6px"></pre>
+  </details>
+</div>
+
+<script>
+"use strict";
+// 简易后台：直连 ops 服务（默认 http://127.0.0.1:5000）。ops CORS 已放开，跨端口可用。
+const OPS_DEFAULT = "http://127.0.0.1:5000";
+const LS_KEY = "npowerOpsTokenV1";
+
+// 参数键 → 表单定义（与 config/params.go NpowerParams 键名一致）
+const PARAM_DEFS = [
+  {k:"StaticRewardRate",                label:"静态收益率 StaticRewardRate",                type:"number", step:"0.001", hint:"默认 0.13"},
+  {k:"DynamicShardReward1GenerateRate", label:"一代动态分享 1Gen",                          type:"number", step:"0.001", hint:"默认 0.015 (直推≥2)"},
+  {k:"DynamicShardReward3GenerateRate", label:"三代动态分享 3Gen",                          type:"number", step:"0.001", hint:"默认 0.02 (直推≥5)"},
+  {k:"DynamicShardReward5GenerateRate", label:"五代动态分享 5Gen",                          type:"number", step:"0.001", hint:"默认 0.025 (直推≥10)"},
+  {k:"TeamRewardRate1",                 label:"团队 F1 伞下比例",                           type:"number", step:"0.001", hint:"默认 0.005"},
+  {k:"TeamRewardRate2",                 label:"团队 F2 伞下比例",                           type:"number", step:"0.001", hint:"默认 0.01"},
+  {k:"TeamRewardRate3",                 label:"团队 F3 伞下比例",                           type:"number", step:"0.001", hint:"默认 0.015"},
+  {k:"LossRate",                        label:"倒2/倒3 扣除比例 LossRate",                  type:"number", step:"0.01",  hint:"默认 0.5 (扣币折算算力)"},
+  {k:"FeeRate",                         label:"提币手续费率 FeeRate",                       type:"number", step:"0.001", hint:"默认 0.03"},
+  {k:"FeeSymbol",                       label:"手续费币种 FeeSymbol",                       type:"text",   hint:"默认 BOFI；切 TM 需补精度/价格源"},
+  {k:"MinRound",                        label:"三进一出 MinRound",                          type:"number", step:"1",     hint:"默认 2 (第N轮结第N-2轮)"},
+  {k:"MinTimeLimitSeconds",             label:"轮次最小时限下限(秒)",                       type:"number", step:"1",     hint:"默认 600"},
+  {k:"F1DirectCount",                   label:"F1 直推人数门槛",                            type:"number", step:"1",     hint:"默认 10"},
+  {k:"F1VoteCount",                     label:"F1 伞下参投/成功人数",                       type:"number", step:"1",     hint:"默认 30"},
+  {k:"F1ToF2Count",                     label:"F1→F2 所需伞下F1数",                        type:"number", step:"1",     hint:"默认 3"},
+  {k:"F2ToF3Count",                     label:"F2→F3 所需伞下F2数",                        type:"number", step:"1",     hint:"默认 3"},
+  {k:"MiningRewardBuff",                label:"矿机收益膨胀倍数",                           type:"number", step:"0.1",   hint:"默认 3"},
+  {k:"MiningRewardSymbol",              label:"矿机产币币种",                               type:"text",   hint:"默认 FIBO"},
+  {k:"MiningWithdrawMinCount",          label:"矿机最低起提数",                             type:"number", step:"1",     hint:"默认 50"},
+  {k:"HashPowerBuff",                   label:"算力矿机三倍倍数",                           type:"number", step:"0.1",   hint:"默认 3"},
+  {k:"HashPowerPoolDailyRatio",         label:"算力矿池日产出占比",                         type:"number", step:"0.01",  hint:"默认 0.3"},
+  {k:"HashPowerMaxDays",                label:"算力 300天保底分母",                         type:"number", step:"1",     hint:"默认 300"},
+  {k:"BurnTarget",                      label:"手续费销毁目标(枚)",                         type:"number", step:"1",     hint:"默认 7777"},
+  {k:"CurrentStage",                    label:"当前阶段(1/2/3)",                            type:"number", step:"1",     hint:"默认 1 (FIBO+USDT)"},
+  {k:"MaxVoteIsPerUserRound",           label:"每轮每用户累计限额=MaxVote (1开/-1关)",    type:"number", step:"1",     hint:"默认开启(需求#2)；-1 显式关闭退回单笔口径"},
+];
+
+const adm = {
+  base: OPS_DEFAULT,
+  token: "",
+  $: id => document.getElementById(id),
+  setStatus(ok, txt){
+    this.$("stDot").className = "dot " + (ok ? "ok" : "bad");
+    this.$("stTxt").textContent = txt;
+  },
+  log(label, obj){
+    const pre = this.$("rawLog");
+    const t = "[" + new Date().toLocaleTimeString() + "] " + label + "\n" +
+              (typeof obj === "string" ? obj : JSON.stringify(obj, null, 1)) +
+              "\n------------------------\n";
+    pre.textContent = t + pre.textContent;
+    if (pre.textContent.length > 20000) pre.textContent = pre.textContent.slice(0, 20000);
+  },
+  async req(path, opts){
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    if (this.token) opts.headers["Authorization"] = "Bearer " + this.token;
+    let resp;
+    try{
+      resp = await fetch(this.base + path, opts);
+    }catch(e){
+      throw new Error("网络错误（请确认 ops 服务已启动: " + this.base + "）: " + e.message);
+    }
+    const raw = await resp.text();
+    let j; try{ j = JSON.parse(raw); }catch(e){ j = raw; }
+    this.log((opts.method||"GET") + " " + path, j);
+    if (j && typeof j === "object" && "code" in j){
+      if (j.code === 200) return j.data !== undefined ? j.data : j;
+      throw new Error(j.msg || ("code " + j.code));
+    }
+    if (!resp.ok) throw new Error("HTTP " + resp.status + " " + raw);
+    return j;
+  },
+  saveToken(){ localStorage.setItem(LS_KEY, JSON.stringify({base: this.base, token: this.token})); },
+  showMsg(id, txt, cls){
+    const el = this.$(id);
+    el.textContent = txt;
+    el.className = "msg show " + (cls || "err");
+    if (cls !== "err") setTimeout(()=>{ el.className = "msg"; }, 6000);
+  },
+  async login(){
+    const base = this.$("opsBase").value.trim().replace(/\/+$/, "");
+    const acct = this.$("acct").value.trim();
+    const pwd = this.$("pwd").value;
+    if (!base || !acct || !pwd){ this.showMsg("loginMsg", "请填全 ops 地址/账号/口令", "err"); return; }
+    try{
+      this.base = base;
+      const d = await this.req("/ops/sign", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({account: acct, pwd})});
+      this.token = typeof d === "string" ? d : (d.token || "");
+      this.saveToken();
+      this.setStatus(true, "已登录 " + base);
+      this.$("loginCard").style.display = "none";
+      ["paramsCard","hpModeCard","quickCard"].forEach(id => this.$(id).style.display = "block");
+      this.loadParams();
+    }catch(e){
+      this.setStatus(false, "登录失败");
+      this.showMsg("quickMsg", "登录失败: " + e.message, "err");
+    }
+  },
+  logout(){
+    this.token = ""; localStorage.removeItem(LS_KEY);
+    this.setStatus(false, "未登录");
+    this.$("loginCard").style.display = "block";
+    ["paramsCard","hpModeCard","quickCard"].forEach(id => this.$(id).style.display = "none");
+  },
+  buildParamFields(){
+    const grid = this.$("paramFields");
+    grid.innerHTML = "";
+    PARAM_DEFS.forEach(def=>{
+      const wrap = document.createElement("div"); wrap.className = "fld";
+      const lab = document.createElement("label"); lab.textContent = def.label;
+      const inp = document.createElement("input");
+      inp.dataset.key = def.k;
+      inp.id = "pf_" + def.k;
+      inp.type = def.type;
+      if (def.step) inp.step = def.step;
+      inp.placeholder = def.hint;
+      inp.autocomplete = "off";
+      const hint = document.createElement("div"); hint.className = "hint"; hint.textContent = def.hint;
+      wrap.appendChild(lab); wrap.appendChild(inp); wrap.appendChild(hint);
+      grid.appendChild(wrap);
+    });
+  },
+  async loadParams(){
+    try{
+      const d = await this.req("/ops/params");
+      const params = (d && d.params) || {};
+      if (!document.querySelector("#paramFields input")) this.buildParamFields();
+      PARAM_DEFS.forEach(def=>{
+        const el = this.$("pf_" + def.k);
+        const v = params[def.k];
+        el.value = (v === undefined || v === null) ? "" : String(v);
+      });
+      this.showMsg("paramsMsg", "已读取 config 表 params（未配置项留空=默认值）", "okk");
+    }catch(e){
+      this.showMsg("paramsMsg", "读取失败: " + e.message, "err");
+    }
+  },
+  collectParams(){
+    const out = {};
+    PARAM_DEFS.forEach(def=>{
+      const el = this.$("pf_" + def.k);
+      const raw = (el.value || "").trim();
+      if (raw === "") return; // 空 = 不覆盖
+      out[def.k] = def.type === "number" ? Number(raw) : raw;
+    });
+    return out;
+  },
+  async saveParams(){
+    const body = this.collectParams();
+    if (!Object.keys(body).length){ this.showMsg("paramsMsg", "没有可保存的改动（全部留空=恢复默认）", "err"); return; }
+    try{
+      const d = await this.req("/ops/params", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+      this.showMsg("paramsMsg", "已保存并热加载 ✓ 修改的键: " + Object.keys(body).join(", ") + "（npower/round/hashpower/burn 重启生效）", "okk");
+    }catch(e){ this.showMsg("paramsMsg", "保存失败: " + e.message, "err"); }
+  },
+  async resetParams(){
+    if (!confirm("清空 config 表 params 并恢复全部默认值？")) return;
+    try{
+      await this.req("/ops/params", {method:"POST", headers:{"Content-Type":"application/json"}, body: "{}"});
+      this.showMsg("paramsMsg", "已清空 params（全部恢复代码默认值）", "okk");
+      this.loadParams();
+    }catch(e){ this.showMsg("paramsMsg", "重置失败: " + e.message, "err"); }
+  },
+  async setHpMode(){
+    const id = parseInt(this.$("hpId").value, 10) || 0;
+    const addr = this.$("hpAddr").value.trim();
+    const mode = parseInt(this.$("hpMode").value, 10);
+    if (!id && !addr){ this.showMsg("hpModeMsg", "请填账户 id 或地址", "err"); return; }
+    const body = {mode};
+    if (id) body.id = id; else body.address = addr;
+    try{
+      await this.req("/ops/setHashPowerMode", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+      this.showMsg("hpModeMsg", "模式设置成功 ✓", "okk");
+    }catch(e){ this.showMsg("hpModeMsg", "失败: " + e.message, "err"); }
+  },
+  async endRound(){
+    const roundId = parseInt(this.$("erRound").value, 10);
+    const act = this.$("erAct").value;
+    if (!roundId){ this.showMsg("quickMsg", "请填 roundId", "err"); return; }
+    if (!confirm("对轮 " + roundId + " 执行 " + act + "？（资金操作，会触发结算/退款/算力折算）")) return;
+    try{
+      await this.req("/ops/endRound", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({roundId, act})});
+      this.showMsg("quickMsg", "执行成功 ✓（请检查轮状态与收益流水）", "okk");
+    }catch(e){ this.showMsg("quickMsg", "失败: " + e.message, "err"); }
+  },
+  async setLevel(){
+    const address = this.$("slAddr").value.trim();
+    const level = parseInt(this.$("slLevel").value, 10);
+    if (!address){ this.showMsg("quickMsg", "请填钱包地址", "err"); return; }
+    try{
+      await this.req("/ops/setLevel", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({address, level})});
+      this.showMsg("quickMsg", "设置等级成功 ✓", "okk");
+    }catch(e){ this.showMsg("quickMsg", "失败: " + e.message, "err"); }
+  }
+};
+
+(function init(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+    if (s && s.token){ adm.token = s.token; adm.base = s.base || OPS_DEFAULT; }
+  }catch(e){}
+  if (adm.token){
+    adm.$("opsBase").value = adm.base;
+    adm.setStatus(true, "已登录 " + adm.base + "（可重新登录）");
+    adm.$("loginCard").style.display = "none";
+    ["paramsCard","hpModeCard","quickCard"].forEach(id => adm.$(id).style.display = "block");
+    adm.loadParams().catch(()=>{});
+  }
+  // 顶栏常驻：登出
+  const out = document.createElement("button");
+  out.className = "ghost sm"; out.textContent = "登出"; out.style.cssText = "margin-left:8px";
+  out.onclick = () => adm.logout();
+  document.querySelector("header").appendChild(out);
+})();
+</script>
+</body>
+</html>

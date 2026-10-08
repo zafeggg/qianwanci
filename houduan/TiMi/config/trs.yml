@@ -1,0 +1,13 @@
+HttpPort: ":3000"
+SecretKey: "dsajflkadsjglafsdj"
+LogPath: trs_hash.log
+Mysql:
+  Dns: root:12345678@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  Password: "123456"
+  Db: 5
+# 充值回调鉴权（复盘 Wave-3）：Secret 非空时 trshash /callback 要求请求头 X-Callback-Key 一致；
+# 留空保持兼容但不安全（启动会 Warn 一次）。生产务必设置随机串。
+Callback:
+  Secret: ""

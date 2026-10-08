@@ -1,0 +1,46 @@
+# round 结算器 —— 私链专用配置
+# 与 etc.privchain.yml 同库同 Redis 库，确保结算的是私链测试数据；
+# HttpPort 置零值不影响：round 是纯 cron 程序，不监听端口（仅配置结构要求有该字段）。
+HttpPort: ":3000"
+secretKey: "privchain-local-secret"
+LogPath: privchain_round.log
+
+Mysql:
+  Dns: root:123456@tcp(127.0.0.1:3306)/crowd_privchain?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+
+Redis:
+  Addr: "localhost:6379"
+  Password: ""
+  # ⚠ 必须与 npower 一致（6），否则读不到同一份运行参数/锁
+  Db: 6
+
+# 链参数：round 本身不直接动链，但 config.Init/applyDefaults 会读，保持一致避免误连主网
+Chain:
+  KtoGrpcAddr: ""
+  FiboRpcUrl: "http://127.0.0.1:8545"
+  FiboChainId: 31337
+  FiboExplorer: ""
+  TmContract: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  Confirmations: 1
+
+TronPool:
+
+  privateKeyEnv: "TRON_POOL_PRIVATE_KEY"
+  Address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  Private: ""
+KtoPool:
+  privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+  Address: ""
+  Private: ""
+TronNetwork:
+  Host: "http://localhost:1527"
+
+Ops:
+  Account: "ops"
+  Password: "privchain-ops-pwd"
+
+Auth:
+  ChainId: 31337
+  Brand: "TiMi"
+
+Params: {}

@@ -1,0 +1,10 @@
+HttpPort: ":3000"
+secretKey: "dsajflkadsjglafsdj"
+LogPath: round_sync.log
+Mysql:
+  Dns: root:123456@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  # 本机 Redis 未设密码，留空（详见 etc.local.yml 注释）
+  Password: ""
+  Db: 5

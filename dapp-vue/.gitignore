@@ -1,0 +1,34 @@
+# ---- 依赖 ----
+node_modules/
+
+# ---- 构建产物 ----
+dist/
+
+# ---- 工具 / 本地数据（.workbuddy 含记忆与验证脚本，不纳入版本控制）----
+.workbuddy/
+
+# ---- 环境变量 ----
+.env
+.env.*
+!.env.example
+# 开发环境变量（仅本地后端地址与空的 API key，无密钥）随仓库分发，保证 clone 即可连本地后端
+!.env.development
+# 生产环境变量模板：只含占位域名与 VITE_ENABLE_MOCK=false，无任何密钥，随仓库分发以便部署方照抄。
+# ⚠ 若在此文件里填入了真实 VITE_API_KEY，请立即改为 CI secrets 注入并从版本库移除。
+!.env.production
+
+# ---- 日志 ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- 编辑器 / 系统 ----
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

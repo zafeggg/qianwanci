@@ -1,0 +1,82 @@
+HttpPort: ":3000"
+SecretKey: "dsajflkadsjglafsdj"
+
+# ==================== 安全配置（生产必改，2026-09-30 新增）====================
+# Mode：联调/本地用 dev；生产必须显式改为 prod。
+#   Mode=prod 时 npower 启动即做配置体检，以下任一项不满足会**直接拒绝启动**（fail-closed）：
+#     - apiAuthKey 为空
+#     - secretKey 仍为示例值（本文件里的 dsajflkadsjglafsdj / privchain-local-secret）
+Mode: "dev"
+# apiAuthKey：/api 适配层鉴权密钥（请求头 X-API-Key），生产必须设置 ≥32 位强随机值。
+#   ⚠ 该 key 会被编译进前端 JS（VITE_API_KEY），对用户不是秘密，只能用来挡扫描器；
+#     用户身份一律靠钱包签名会话（/api/auth/nonce → /api/auth/login），写接口强制要求会话。
+apiAuthKey: ""
+LogPath: crowd.log
+Mysql:
+  Dns: root:12345678@tcp(127.0.0.1:3306)/crowd_local?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai
+Redis:
+  Addr: "localhost:6379"
+  Password: "123456"
+  Db: 5
+# ⚠⚠ 密钥纪律（2026-09-30 审计结论，部署前必读）⚠⚠
+#   下面的 Private 字段是**明文私钥**且已进入 git 历史。生产部署必须：
+#     1) 清空 Private，改用 privateKeyEnv 指定环境变量名注入（systemd EnvironmentFile + chmod 600）；
+#     2) 视为已泄漏：这些地址上的资产**全部转移到新生成的密钥**（轮换）；
+#     3) 需要清理历史则见 千万次-生产部署清单.md §3「密钥纪律」。
+#   Mode=prod 启动时若仍检测到明文私钥会打印安全警告。
+KtoPool:
+  privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+  Address: KtoC8VAmLjrzL1MCXgWskJjJABnQbMr1QWTPrYfmgMDPPvL
+  Private: ""   # 已迁出：见 KTO_POOL_PRIVATE_KEY（config/secrets.local.env）
+  # privateKeyEnv: "KTO_POOL_PRIVATE_KEY"
+TronPool:
+
+  privateKeyEnv: "TRON_POOL_PRIVATE_KEY"
+  Address: TR7buqoSAxST1YfBwno9D6n8S2JUQDahDP
+  Private: ""   # 已迁出：见 TRON_POOL_PRIVATE_KEY（config/secrets.local.env）
+  # privateKeyEnv: "TRON_POOL_PRIVATE_KEY"
+# 已删除的死配置（2026-09-30）：TronNode（含 trongrid ApiKey，全仓无消费者）、
+# MinePool / BofiPool（全仓无消费者）、Chain.FiboExplorer（前端用 VITE_CHAIN_EXPLORER）。
+TronNetwork:
+  Host: http://localhost:1527
+
+
+# ==================== 钱包签名会话（2026-09-30 生产口径）====================
+Auth:
+  # NonceTTLSeconds / SessionTTLSeconds / ChainId / Brand：留空即用代码默认
+  #（nonce 300s、会话 7 天、chainId 取 Chain.FiboChainId、品牌 "TiMi"）
+  RequireInviteCode: false
+  # EnforceSession：true = **读接口**也要求会话票（写接口无论该值都强制）。
+  # ⚠ 生产模板默认置 true：原先读接口凭 X-API-Key 即可按任意地址查资产/团队关系，
+  #   相当于把用户资产与伞下结构公开。置 true 后**用户数据类读接口**（/api/assets|user|miner）
+  #   在未签名时返回 401（页面会引导签名登录）；公共只读接口（/api/prices|rounds|rules|deposit/info）不受影响。
+  #   如果你的 DApp 需要在"未连接钱包"时展示资产/团队数据，再显式改为 false。
+  EnforceSession: true
+  # AllowUnsignedWrite：**仅联调**开关（允许无会话的写请求沿用 body 地址）。
+  #   Mode=prod 时该开关被强制忽略；生产务必为 false。
+  AllowUnsignedWrite: false
+# ==================== 生产加固（2026-09-18 新增）====================
+# 链服务端点：原先硬编码在 utils/kto/kto.go（旧 Npower 节点），生产必须改为本环境地址
+Chain:
+  KtoGrpcAddr: "106.12.94.134:8545"   # 待替换为生产 KTO gRPC 节点
+  FiboRpcUrl: "https://network.hzroc.art"
+  FiboChainId: 12306
+  TmContract: ""                      # TM 合约部署后填入（contracts/deployments/fibo.json）
+  Confirmations: 12
+  # ==================== 充值监听起始块（2026-09-30 新增，上线必填）====================
+  # cmd/evmwatch 首次运行且 Redis 无扫块进度时，从这里开始扫。
+  # ⚠ 不填（=0）且未传 -fromBlock 时，evmwatch 会**拒绝启动**（fail-closed）——
+  #   原实现会静默从最新块开始，导致"上线前的充值永远不入账"，要等对账才发现。
+  #   请填 TM 合约部署高度（或开始接收充值的高度）。
+  WatchStartBlock: 0
+  # 仅联调逃生开关：true = 允许无进度时从最新块开始（放弃补扫历史）。生产必须保持 false。
+  AllowStartFromLatest: false
+# ==================== 提现额度（owner 2026-09-30 敲定）====================
+# ⚠ NpowerParams 必须写在 Params 段内；写在顶层不会生效（实测踩过，E2E 立刻抓到）。
+Params:
+  # 最低起提 100 个（按被提币种个数计，防粉尘提现亏链上手续费）。代码默认值即 100，这里显式写出便于运维核对。
+  WithdrawMinAmount: 100
+  # ⚠ owner 2026-09-30 裁定：**提现无上限** —— 单笔不封顶、单日不限、不设笔数限制。
+  #   实现上就是"不配置这三个参数"（0 = 不限）；历史上的 10000 硬编码兜底与"最多 3 次/24h"计数**已删除**
+  #   （见 http/handler/wallet.go），所以 0 现在是真的不限，不会被悄悄卡住。
+  #   如日后要设限制：/ops/params 下发 WithdrawSingleMax / WithdrawDailyMax / WithdrawDailyCountMax（-1 = 取消）。
